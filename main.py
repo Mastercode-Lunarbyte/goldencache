@@ -1,14 +1,7 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import os
 from flask import Flask, request
 import requests
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -17,21 +10,17 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import chromedriver_autoinstaller
 
-
 app = Flask(__name__)
-
-# دریافت توکن تلگرام از متغیر محیطی
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
 def get_product_details(product_name):
-        chromedriver_autoinstaller.install()  # نصب خودکار نسخه‌ی مناسب در شروع
+    chromedriver_autoinstaller.install()  # نصب خودکار در آغاز
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    
     driver = webdriver.Chrome(options=options)
-    service = Service(executable_path="/usr/bin/chromedriver")  # مسیر استاندارد در کانتینر
-    driver = webdriver.Chrome(service=service, options=options)
 
     all_products = []
     try:
@@ -93,7 +82,5 @@ def telegram_webhook():
 
     return "ok"
 
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
