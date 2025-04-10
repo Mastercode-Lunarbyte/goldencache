@@ -1,0 +1,7 @@
+flask
+selenium
+requests
+gunicorn
+pillow
+chromedriver-autoinstaller
+bs4
