@@ -13,7 +13,7 @@ import json
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-
+GROUP_ID = "https://t.me/+WpqVX41kCIw2MWE0"  # گروه تلگرام شما
 
 # ذخیره اطلاعات کاربران
 users_file = "users.json"
@@ -85,6 +85,12 @@ def get_product_details(product_name):
     best = sorted_products[0]
     return f"📷 {best['title']}\n🛍️ {best['seller']}\n💰 {best['price']} تومان\n🔗 {best['link']}"
 
+def is_member(chat_id):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
+    response = requests.get(url, params={"chat_id": GROUP_ID, "user_id": chat_id})
+    data = response.json()
+    return data.get("result", {}).get("status") in ["member", "administrator", "creator"]
+
 def send_welcome_message(chat_id):
     message = (
         "👋 سلام! خوش آمدید به ربات مقایسه قیمت محصولات.\n"
@@ -105,15 +111,18 @@ def telegram_webhook():
         users[chat_id] = {"username": username}
         save_users(users)
 
-    # حذف شرط عضویت در گروه
-    text = data["message"].get("text", "")
-    if text.lower() == "/start":
-        send_welcome_message(chat_id)
-        reply = "🔎 لطفاً نام محصول را ارسال کنید."
-    elif text:
-        reply = get_product_details(text)
+    # بررسی عضویت در گروه
+    if not is_member(chat_id):
+        reply = "❌ برای استفاده از ربات باید عضو کانال تلگرام ما باشید. لطفاً به کانال بپیوندید."
     else:
-        reply = "🔎 لطفاً نام محصول را ارسال کنید."
+        text = data["message"].get("text", "")
+        if text.lower() == "/start":
+            send_welcome_message(chat_id)
+            reply = "🔎 لطفاً نام محصول را ارسال کنید."
+        elif text:
+            reply = get_product_details(text)
+        else:
+            reply = "🔎 لطفاً نام محصول را ارسال کنید."
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": chat_id, "text": reply})
