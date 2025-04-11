@@ -13,7 +13,7 @@ import json
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-GROUP_ID = "your_telegram_group_id"  # گروه تلگرام شما
+GROUP_ID = "https://t.me/+pj27JSRrPiA5Yjg8"  # گروه تلگرام شما
 
 # ذخیره اطلاعات کاربران
 users_file = "users.json"
