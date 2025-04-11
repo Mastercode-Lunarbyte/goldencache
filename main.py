@@ -96,6 +96,8 @@ def is_member(chat_id):
         status = data['result'].get('status')
         if status in ["member", "administrator", "creator"]:
             return True
+
+    # اگر وضعیت از هیچکدام از حالت‌های بالا نباشد، کاربر عضوی نیست
     return False
 
 @app.route("/", methods=["POST"])
