@@ -95,12 +95,11 @@ def is_member(chat_id):
     if data.get('ok') and 'result' in data:
         status = data['result'].get('status')
         # بررسی وضعیت عضویت: member، administrator یا creator
-        if status in ["member", "administrator", "creator","EcoBuildExperts"]:
+        if status in ["member", "administrator", "creator"]:
             return True
 
     # اگر وضعیت از هیچکدام از حالت‌های بالا نباشد، کاربر عضوی نیست
     return False
-
 
 @app.route("/", methods=["POST"])
 def telegram_webhook():
@@ -130,6 +129,7 @@ def telegram_webhook():
         else:
             reply = "🔎 لطفاً نام محصول را ارسال کنید."
 
+    # ارسال پیام به کاربر
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": chat_id, "text": reply})
 
