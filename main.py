@@ -13,7 +13,8 @@ import json
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-GROUP_ID = "https://t.me/+pj27JSRrPiA5Yjg8"  # گروه تلگرام شما
+GROUP_ID = "@Golden_Cache"  # نام گروه تلگرام شما
+GROUP_INVITE_LINK = "https://t.me/+pj27JSRrPiA5Yjg8"  # لینک دعوت به گروه
 
 # ذخیره اطلاعات کاربران
 users_file = "users.json"
@@ -113,7 +114,10 @@ def telegram_webhook():
 
     # بررسی عضویت در گروه
     if not is_member(chat_id):
-        reply = "❌ برای استفاده از ربات باید عضو گروه تلگرام ما باشید. لطفاً به گروه بپیوندید."
+        reply = (
+            f"❌ برای استفاده از ربات باید عضو کانال تلگرام ما باشید.\n"
+            f"لطفاً به گروه بپیوندید: {GROUP_INVITE_LINK}"
+        )
     else:
         text = data["message"].get("text", "")
         if text.lower() == "/start":
