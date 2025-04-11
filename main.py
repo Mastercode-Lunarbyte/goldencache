@@ -95,7 +95,7 @@ def is_member(chat_id):
     if data.get('ok') and 'result' in data:
         status = data['result'].get('status')
         # بررسی وضعیت عضویت: member، administrator یا creator
-        if status in ["member", "administrator", "creator"]:
+        if status in ["member", "administrator", "creator","EcoBuildExperts"]:
             return True
 
     # اگر وضعیت از هیچکدام از حالت‌های بالا نباشد، کاربر عضوی نیست
