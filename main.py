@@ -9,9 +9,28 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import chromedriver_autoinstaller
+import json
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+GROUP_ID = "your_telegram_group_id"  # گروه تلگرام شما
+
+# ذخیره اطلاعات کاربران
+users_file = "users.json"
+
+# خواندن کاربران از فایل
+def load_users():
+    if os.path.exists(users_file):
+        with open(users_file, 'r') as f:
+            return json.load(f)
+    return {}
+
+# ذخیره کاربران به فایل
+def save_users(users):
+    with open(users_file, 'w') as f:
+        json.dump(users, f)
+
+users = load_users()
 
 def get_product_details(product_name):
     chromedriver_autoinstaller.install()  # نصب خودکار در آغاز
@@ -66,21 +85,54 @@ def get_product_details(product_name):
     best = sorted_products[0]
     return f"📷 {best['title']}\n🛍️ {best['seller']}\n💰 {best['price']} تومان\n🔗 {best['link']}"
 
+def is_member(chat_id):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
+    response = requests.get(url, params={"chat_id": GROUP_ID, "user_id": chat_id})
+    data = response.json()
+    return data.get("result", {}).get("status") in ["member", "administrator", "creator"]
+
+def send_welcome_message(chat_id):
+    message = (
+        "👋 سلام! خوش آمدید به ربات مقایسه قیمت محصولات.\n"
+        "در این ربات شما می‌توانید با وارد کردن نام محصول، بهترین قیمت آن را پیدا کنید.\n"
+        "برای شروع، کافی است نام محصول مورد نظر خود را وارد کنید."
+    )
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": chat_id, "text": message})
+
 @app.route("/", methods=["POST"])
 def telegram_webhook():
     data = request.json
     chat_id = data["message"]["chat"]["id"]
-    text = data["message"].get("text", "")
+    username = data["message"]["chat"].get("username", "نامشخص")
+    
+    # ذخیره اطلاعات کاربر
+    if chat_id not in users:
+        users[chat_id] = {"username": username}
+        save_users(users)
 
-    if text:
-        reply = get_product_details(text)
+    # بررسی عضویت در گروه
+    if not is_member(chat_id):
+        reply = "❌ برای استفاده از ربات باید عضو گروه تلگرام ما باشید. لطفاً به گروه بپیوندید."
     else:
-        reply = "🔎 لطفاً نام محصول را ارسال کنید."
+        text = data["message"].get("text", "")
+        if text.lower() == "/start":
+            send_welcome_message(chat_id)
+            reply = "🔎 لطفاً نام محصول را ارسال کنید."
+        elif text:
+            reply = get_product_details(text)
+        else:
+            reply = "🔎 لطفاً نام محصول را ارسال کنید."
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": chat_id, "text": reply})
 
     return "ok"
+
+@app.route("/stats", methods=["GET"])
+def stats():
+    total_users = len(users)
+    return f"تعداد کل کاربران: {total_users}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
