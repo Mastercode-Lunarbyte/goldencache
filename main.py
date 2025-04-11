@@ -102,7 +102,7 @@ def telegram_webhook():
 
     # بررسی عضویت کاربر در کانال
     if not is_user_in_channel(user_id) and user_id not in ADMIN_IDS:
-        join_msg = f"❗ برای استفاده از ربات لطفاً ابتدا در کانال ما عضو شوید:\n👉 https://t.me/+WpqVX41kCIw2MWE0"
+        join_msg = f"❗ برای استفاده از ربات لطفاً ابتدا در کانال ما عضو شوید:\n👉 https://t.me/goldencache"
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": join_msg})
         return "ok"
 
