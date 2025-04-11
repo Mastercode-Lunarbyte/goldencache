@@ -90,7 +90,45 @@ def is_member(chat_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
     response = requests.get(url, params={"chat_id": GROUP_ID, "user_id": chat_id})
     data = response.json()
-    return data.get("result", {}).get("status") in ["member", "administrator", "creator"]
+    
+    # بررسی عضویت در گروه
+    if 'result' in data and 'status' in data['result']:
+        status = data['result']['status']
+        if status in ["member", "administrator", "creator"]:
+            return True
+    return False
+
+@app.route("/", methods=["POST"])
+def telegram_webhook():
+    data = request.json
+    chat_id = data["message"]["chat"]["id"]
+    username = data["message"]["chat"].get("username", "نامشخص")
+    
+    # ذخیره اطلاعات کاربر
+    if chat_id not in users:
+        users[chat_id] = {"username": username}
+        save_users(users)
+
+    # بررسی عضویت در گروه
+    if not is_member(chat_id):
+        reply = (
+            f"❌ برای استفاده از ربات باید عضو کانال تلگرام ما باشید.\n"
+            f"لطفاً به گروه بپیوندید: {GROUP_INVITE_LINK}"
+        )
+    else:
+        text = data["message"].get("text", "")
+        if text.lower() == "/start":
+            send_welcome_message(chat_id)
+            reply = "🔎 لطفاً نام محصول را ارسال کنید."
+        elif text:
+            reply = get_product_details(text)
+        else:
+            reply = "🔎 لطفاً نام محصول را ارسال کنید."
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    requests.post(url, json={"chat_id": chat_id, "text": reply})
+
+    return "ok"
 
 def send_welcome_message(chat_id):
     message = (
