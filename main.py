@@ -94,11 +94,13 @@ def is_member(chat_id):
     # بررسی عضویت در گروه
     if data.get('ok') and 'result' in data:
         status = data['result'].get('status')
+        # بررسی وضعیت عضویت: member، administrator یا creator
         if status in ["member", "administrator", "creator"]:
             return True
 
     # اگر وضعیت از هیچکدام از حالت‌های بالا نباشد، کاربر عضوی نیست
     return False
+
 
 @app.route("/", methods=["POST"])
 def telegram_webhook():
