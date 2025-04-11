@@ -90,10 +90,10 @@ def is_member(chat_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
     response = requests.get(url, params={"chat_id": GROUP_ID, "user_id": chat_id})
     data = response.json()
-    
+
     # بررسی عضویت در گروه
-    if 'result' in data and 'status' in data['result']:
-        status = data['result']['status']
+    if data.get('ok') and 'result' in data:
+        status = data['result'].get('status')
         if status in ["member", "administrator", "creator"]:
             return True
     return False
@@ -113,7 +113,8 @@ def telegram_webhook():
     if not is_member(chat_id):
         reply = (
             f"❌ برای استفاده از ربات باید عضو کانال تلگرام ما باشید.\n"
-            f"لطفاً به گروه بپیوندید: {GROUP_INVITE_LINK}"
+            f"لطفاً به گروه بپیوندید: {GROUP_INVITE_LINK}\n"
+            f"لینک دعوت: {GROUP_INVITE_LINK}"
         )
     else:
         text = data["message"].get("text", "")
