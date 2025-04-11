@@ -12,10 +12,26 @@ import chromedriver_autoinstaller
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-CHANNEL_USERNAME = "WpqVX41kCIw2MWE0"  # نام کاربری کانال تلگرام (بدون @)
+CHANNEL_USERNAME = "@goldencache"  # نام کاربری کانال شما، بدون لینک joinchat
+ADMIN_IDS = [6248183202]  # شناسه تلگرام ادمین‌ها، مثلاً شناسه خودت
+
+def is_user_in_channel(user_id):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
+    params = {
+        "chat_id": CHANNEL_USERNAME,
+        "user_id": user_id
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    try:
+        status = data["result"]["status"]
+        return status in ["member", "creator", "administrator"]
+    except:
+        return False
 
 def get_product_details(product_name):
-    chromedriver_autoinstaller.install()  # نصب خودکار در آغاز
+    chromedriver_autoinstaller.install()
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -67,38 +83,36 @@ def get_product_details(product_name):
     best = sorted_products[0]
     return f"📷 {best['title']}\n🛍️ {best['seller']}\n💰 {best['price']} تومان\n🔗 {best['link']}"
 
-def check_membership(chat_id):
-    # بررسی عضویت کاربر در کانال
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
-    params = {
-        "chat_id": f"@{CHANNEL_USERNAME}",
-        "user_id": chat_id
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    if data["ok"] and data["result"]["status"] in ["member", "administrator", "creator"]:
-        return True
-    return False
-
 @app.route("/", methods=["POST"])
 def telegram_webhook():
     data = request.json
-    chat_id = data["message"]["chat"]["id"]
-    text = data["message"].get("text", "")
+    message = data.get("message")
+    if not message:
+        return "no message"
+    
+    chat_id = message["chat"]["id"]
+    user_id = message["from"]["id"]
+    text = message.get("text", "")
 
-    # بررسی عضویت کاربر
-    if not check_membership(chat_id):
-        reply = "❌ شما باید عضو کانال ما باشید تا از ربات استفاده کنید.\nلطفاً به کانال عضو شوید: https://t.me/+WpqVX41kCIw2MWE0"
+    # پیام خوش‌آمدگویی عمومی
+    if text.lower() in ["/start", "start", "سلام", "سلام ربات"]:
+        welcome = "👋 سلام! خوش اومدی 🌟\nاین ربات بهت کمک می‌کنه **بهترین قیمت** محصولات رو توی فروشگاه‌های آنلاین ایران پیدا کنی.\nفقط کافیه اسم محصول رو بنویسی! 📦💬"
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": welcome})
+        return "ok"
+
+    # بررسی عضویت کاربر در کانال
+    if not is_user_in_channel(user_id) and user_id not in ADMIN_IDS:
+        join_msg = f"❗ برای استفاده از ربات لطفاً ابتدا در کانال ما عضو شوید:\n👉 https://t.me/+WpqVX41kCIw2MWE0"
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": join_msg})
+        return "ok"
+
+    # دریافت قیمت محصول
+    if text:
+        reply = get_product_details(text)
     else:
-        # پیام خوشامدگویی
-        if text.lower() == "/start":
-            reply = "👋 خوش آمدید به ربات جستجوگر قیمت! این ربات بهترین قیمت‌ها رو از فروشگاه‌های مختلف نمایش میده.\nفقط کافیه اسم محصول رو تایپ کنید و ربات بهترین گزینه‌ها رو به شما نشون میده!"
-        else:
-            reply = get_product_details(text) if text else "🔎 لطفاً نام محصول را ارسال کنید."
+        reply = "🔎 لطفاً نام محصول را ارسال کنید."
 
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": reply})
-
+    requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": reply})
     return "ok"
 
 if __name__ == "__main__":
