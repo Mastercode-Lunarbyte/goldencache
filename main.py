@@ -9,29 +9,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import chromedriver_autoinstaller
-import json
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-GROUP_ID = "@Golden_cache"  # نام گروه تلگرام شما
-GROUP_INVITE_LINK = "https://t.me/+WpqVX41kCIw2MWE0"  # لینک دعوت به گروه
-
-# ذخیره اطلاعات کاربران
-users_file = "users.json"
-
-# خواندن کاربران از فایل
-def load_users():
-    if os.path.exists(users_file):
-        with open(users_file, 'r') as f:
-            return json.load(f)
-    return {}
-
-# ذخیره کاربران به فایل
-def save_users(users):
-    with open(users_file, 'w') as f:
-        json.dump(users, f)
-
-users = load_users()
+CHANNEL_USERNAME = "WpqVX41kCIw2MWE0"  # نام کاربری کانال تلگرام (بدون @)
 
 def get_product_details(product_name):
     chromedriver_autoinstaller.install()  # نصب خودکار در آغاز
@@ -86,68 +67,39 @@ def get_product_details(product_name):
     best = sorted_products[0]
     return f"📷 {best['title']}\n🛍️ {best['seller']}\n💰 {best['price']} تومان\n🔗 {best['link']}"
 
-def is_member(chat_id):
+def check_membership(chat_id):
+    # بررسی عضویت کاربر در کانال
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
-    response = requests.get(url, params={"chat_id": GROUP_ID, "user_id": chat_id})
+    params = {
+        "chat_id": f"@{CHANNEL_USERNAME}",
+        "user_id": chat_id
+    }
+    response = requests.get(url, params=params)
     data = response.json()
-
-    # بررسی عضویت در گروه
-    if data.get('ok') and 'result' in data:
-        status = data['result'].get('status')
-        # بررسی وضعیت عضویت: member، administrator یا creator
-        if status in ["member", "administrator", "creator"]:
-            return True
-
-    # اگر وضعیت از هیچکدام از حالت‌های بالا نباشد، کاربر عضوی نیست
+    if data["ok"] and data["result"]["status"] in ["member", "administrator", "creator"]:
+        return True
     return False
 
 @app.route("/", methods=["POST"])
 def telegram_webhook():
     data = request.json
     chat_id = data["message"]["chat"]["id"]
-    username = data["message"]["chat"].get("username", "نامشخص")
-    
-    # ذخیره اطلاعات کاربر
-    if chat_id not in users:
-        users[chat_id] = {"username": username}
-        save_users(users)
+    text = data["message"].get("text", "")
 
-    # بررسی عضویت در گروه
-    if not is_member(chat_id):
-        reply = (
-            f"❌ برای استفاده از ربات باید عضو کانال تلگرام ما باشید.\n"
-            f"لطفاً به گروه بپیوندید: {GROUP_INVITE_LINK}\n"
-            f"لینک دعوت: {GROUP_INVITE_LINK}"
-        )
+    # بررسی عضویت کاربر
+    if not check_membership(chat_id):
+        reply = "❌ شما باید عضو کانال ما باشید تا از ربات استفاده کنید.\nلطفاً به کانال عضو شوید: https://t.me/+WpqVX41kCIw2MWE0"
     else:
-        text = data["message"].get("text", "")
+        # پیام خوشامدگویی
         if text.lower() == "/start":
-            send_welcome_message(chat_id)
-            reply = "🔎 لطفاً نام محصول را ارسال کنید."
-        elif text:
-            reply = get_product_details(text)
+            reply = "👋 خوش آمدید به ربات جستجوگر قیمت! این ربات بهترین قیمت‌ها رو از فروشگاه‌های مختلف نمایش میده.\nفقط کافیه اسم محصول رو تایپ کنید و ربات بهترین گزینه‌ها رو به شما نشون میده!"
         else:
-            reply = "🔎 لطفاً نام محصول را ارسال کنید."
+            reply = get_product_details(text) if text else "🔎 لطفاً نام محصول را ارسال کنید."
 
-    # ارسال پیام به کاربر
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": chat_id, "text": reply})
 
     return "ok"
-
-def send_welcome_message(chat_id):
-    message = (
-        "👋 سلام! خوش آمدید به ربات مقایسه قیمت محصولات.\n"
-        "در این ربات شما می‌توانید با وارد کردن نام محصول، بهترین قیمت آن را پیدا کنید.\n"
-        "برای شروع، کافی است نام محصول مورد نظر خود را وارد کنید."
-    )
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": message})
-
-@app.route("/stats", methods=["GET"])
-def stats():
-    total_users = len(users)
-    return f"تعداد کل کاربران: {total_users}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
