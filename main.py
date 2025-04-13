@@ -13,7 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHANNEL_USERNAME = "@goldencache"
-ADMIN_IDS = [6248183202]
+ADMIN_IDS = []
 
 def is_user_in_channel(user_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
