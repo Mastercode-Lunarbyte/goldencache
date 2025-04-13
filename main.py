@@ -79,9 +79,16 @@ def get_product_details(product_name):
     if not all_products:
         return "❌ هیچ محصولی یافت نشد."
 
+    # محصولات را بر اساس قیمت مرتب کنید و بهترین سه محصول را انتخاب کنید
     sorted_products = sorted(all_products, key=lambda x: x["price"])
-    best = sorted_products[0]
-    return f"📷 {best['title']}\n🛍️ {best['seller']}\n💰 {best['price']} تومان\n🔗 {best['link']}"
+    top_three = sorted_products[:3]  # گرفتن سه محصول برتر
+
+    # ارسال لیست سه محصول
+    reply = ""
+    for product in top_three:
+        reply += f"📷 {product['title']}\n🛍️ {product['seller']}\n💰 {product['price']} تومان\n🔗 {product['link']}\n\n"
+
+    return reply
 
 @app.route("/", methods=["POST"])
 def telegram_webhook():
