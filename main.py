@@ -1,5 +1,4 @@
 import logging
-
 import os
 import time
 import requests
@@ -19,7 +18,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHANNEL_USERNAME = "@goldencache"
 ADMIN_IDS = []
 
-executor = ThreadPoolExecutor(max_workers=3)  # محدود کردن تعداد تردها
+executor = ThreadPoolExecutor(max_workers=3)
 
 def is_user_in_channel(user_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
@@ -30,39 +29,34 @@ def is_user_in_channel(user_id):
 def format_price(price):
     return f"{price:,}".replace(",", "٬")
 
-
-
-# تنظیمات لاگ‌برداری برای خطاها
+# تنظیمات لاگ‌برداری
 logging.basicConfig(level=logging.DEBUG)
 
 def get_product_details_sync(product_name, count=3):
     chromedriver_autoinstaller.install()
+
     options = Options()
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=options)
 
+    driver = webdriver.Chrome(options=options)
     results = []
+
     try:
         driver.get("https://emalls.ir/")
 
-        # صبر کن تا کادر جستجو لود بشه
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch"))
         )
 
-        # عبارت جستجو و کلیک روی دکمه جستجو
-        search_box = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch")
-        search_box.clear()
-        search_box.send_keys(product_name)
+        driver.execute_script(f"""
+            document.getElementById('ContentPlaceHolder1_SearchInBottom_txtSearch').value = "{product_name}";
+            document.getElementById('ContentPlaceHolder1_SearchInBottom_btnSearch').click();
+        """)
 
-        search_button = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_btnSearch")
-        search_button.click()
-
-        # منتظر بمون تا نتایج بیان
         WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block"))
+            EC.presence_of_element_located((By.CLASS_NAME, "product-block"))
         )
         time.sleep(2)
 
@@ -84,13 +78,14 @@ def get_product_details_sync(product_name, count=3):
                 })
             except:
                 continue
+
     except Exception as e:
         return f"❌ خطا در دریافت اطلاعات:\n{e}"
     finally:
         driver.quit()
 
     if not results:
-        return "❌ هیچ محصولی یافت نشد."
+        return "❌ هیچ محصولی پیدا نشد یا سایت پاسخی نداد."
 
     results = sorted(results, key=lambda x: x["price"])[:count]
     message = f"📦 نتایج برای: *{product_name}*\n\n"
@@ -100,10 +95,6 @@ def get_product_details_sync(product_name, count=3):
         message += f"   💰 {format_price(p['price'])} تومان\n"
         message += f"   🔗 [لینک خرید]({p['link']})\n\n"
     return message
-
-
-
-
 
 async def get_product_details_async(product_name):
     loop = asyncio.get_event_loop()
@@ -124,7 +115,11 @@ async def handle_telegram(data):
     text = message.get("text", "")
 
     if text.lower() in ["/start", "start", "سلام", "سلام ربات"]:
-        welcome = "👋 سلام! خوش اومدی 🌟\nاین ربات بهت کمک می‌کنه **بهترین قیمت** محصولات رو توی فروشگاه‌های آنلاین ایران پیدا کنی.\nفقط کافیه اسم محصول رو بنویسی! 📦💬"
+        welcome = (
+            "👋 سلام! خوش اومدی 🌟\n"
+            "این ربات بهت کمک می‌کنه **بهترین قیمت** محصولات رو توی فروشگاه‌های آنلاین ایران پیدا کنی.\n"
+            "فقط کافیه اسم محصول رو بنویسی! 📦💬"
+        )
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
             "chat_id": chat_id, "text": welcome
         })
