@@ -42,12 +42,14 @@ def get_product_details_sync(product_name, count=3):
         search_box = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch")
         search_box.send_keys(product_name, Keys.RETURN)
 
-        WebDriverWait(driver, 10).until(
+        WebDriverWait(driver, 15).until(
             EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block"))
-        )
-        time.sleep(2)
-
+        )  # انتظار بیشتر برای بارگذاری کامل نتایج
         product_blocks = driver.find_elements(By.CLASS_NAME, "product-block")
+        
+        if not product_blocks:
+            raise Exception("هیچ محصولی پیدا نشد.")
+
         for block in product_blocks:
             try:
                 title = block.find_element(By.CLASS_NAME, "prd-name").text.strip()
@@ -63,7 +65,7 @@ def get_product_details_sync(product_name, count=3):
                     "seller": seller,
                     "link": link
                 })
-            except:
+            except Exception as e:
                 continue
     except Exception as e:
         return f"❌ خطا در دریافت اطلاعات:\n{e}"
@@ -71,7 +73,7 @@ def get_product_details_sync(product_name, count=3):
         driver.quit()
 
     if not results:
-        return "❌ هیچ محصولی یافت نشد."
+        return "❌،هیچ محصولی یافت نشد، محصول دیگری را جستجو کنید."
 
     results = sorted(results, key=lambda x: x["price"])[:count]
     message = f"📦 نتایج برای: *{product_name}*\n\n"
@@ -81,6 +83,7 @@ def get_product_details_sync(product_name, count=3):
         message += f"   💰 {format_price(p['price'])} تومان\n"
         message += f"   🔗 [لینک خرید]({p['link']})\n\n"
     return message
+
 
 async def get_product_details_async(product_name):
     loop = asyncio.get_event_loop()
