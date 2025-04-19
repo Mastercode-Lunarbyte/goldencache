@@ -1,6 +1,8 @@
 import os
 import time
 import requests
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import chromedriver_autoinstaller
 from flask import Flask, request
 from selenium import webdriver
@@ -15,6 +17,8 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHANNEL_USERNAME = "@goldencache"
 ADMIN_IDS = []
 
+executor = ThreadPoolExecutor(max_workers=3)  # محدود کردن تعداد تردها
+
 def is_user_in_channel(user_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
     params = {"chat_id": CHANNEL_USERNAME, "user_id": user_id}
@@ -24,7 +28,7 @@ def is_user_in_channel(user_id):
 def format_price(price):
     return f"{price:,}".replace(",", "٬")
 
-def get_product_details(product_name, count=3):
+def get_product_details_sync(product_name, count=3):
     chromedriver_autoinstaller.install()
     options = Options()
     options.add_argument("--headless")
@@ -78,12 +82,19 @@ def get_product_details(product_name, count=3):
         message += f"   🔗 [لینک خرید]({p['link']})\n\n"
     return message
 
+async def get_product_details_async(product_name):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, get_product_details_sync, product_name)
+
 @app.route("/", methods=["POST"])
 def telegram_webhook():
-    data = request.json
+    asyncio.run(handle_telegram(request.json))
+    return "ok"
+
+async def handle_telegram(data):
     message = data.get("message")
     if not message:
-        return "no message"
+        return
 
     chat_id = message["chat"]["id"]
     user_id = message["from"]["id"]
@@ -94,14 +105,14 @@ def telegram_webhook():
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
             "chat_id": chat_id, "text": welcome
         })
-        return "ok"
+        return
 
     if not is_user_in_channel(user_id) and user_id not in ADMIN_IDS:
         join_msg = f"❗ برای استفاده از ربات لطفاً ابتدا در کانال ما عضو شوید:\n👉 https://t.me/goldencache"
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
             "chat_id": chat_id, "text": join_msg
         })
-        return "ok"
+        return
 
     if text:
         waiting = "⏳ در حال جستجوی محصول مورد نظر شما هستم..."
@@ -109,7 +120,10 @@ def telegram_webhook():
             "chat_id": chat_id, "text": waiting
         })
 
-        reply = get_product_details(text)
+        try:
+            reply = await get_product_details_async(text)
+        except Exception as e:
+            reply = f"❌ خطا در جستجو: {str(e)}"
     else:
         reply = "🔎 لطفاً نام محصول را وارد کنید."
 
@@ -119,7 +133,6 @@ def telegram_webhook():
         "parse_mode": "Markdown",
         "disable_web_page_preview": True
     })
-    return "ok"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
