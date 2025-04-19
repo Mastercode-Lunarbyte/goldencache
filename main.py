@@ -41,31 +41,32 @@ def get_product_details_sync(product_name, count=3):
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")  # اضافه کردن این برای بهبود عملکرد در headless mode
     driver = webdriver.Chrome(options=options)
 
     results = []
     try:
-        logging.info(f"Starting search for: {product_name}")  # لاگ: شروع جستجو
         driver.get("https://emalls.ir/")
 
-        # اطمینان از بارگذاری کامل صفحه
+        # صبر کن تا کادر جستجو لود بشه
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch"))
+        )
+
+        # عبارت جستجو و کلیک روی دکمه جستجو
         search_box = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch")
-        search_box.send_keys(product_name, Keys.RETURN)
+        search_box.clear()
+        search_box.send_keys(product_name)
 
-        logging.info(f"Search triggered for: {product_name}")  # لاگ: شروع جستجو در سایت
+        search_button = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_btnSearch")
+        search_button.click()
 
-        WebDriverWait(driver, 30).until(
+        # منتظر بمون تا نتایج بیان
+        WebDriverWait(driver, 10).until(
             EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block"))
         )
-        logging.info("Product blocks loaded.")  # لاگ: بارگذاری بلوک‌های محصول
+        time.sleep(2)
 
         product_blocks = driver.find_elements(By.CLASS_NAME, "product-block")
-
-        if not product_blocks:
-            logging.error(f"No products found for '{product_name}'")  # لاگ: هیچ محصولی پیدا نشد
-            raise Exception(f"No products found for '{product_name}'")
-
         for block in product_blocks:
             try:
                 title = block.find_element(By.CLASS_NAME, "prd-name").text.strip()
@@ -81,19 +82,14 @@ def get_product_details_sync(product_name, count=3):
                     "seller": seller,
                     "link": link
                 })
-            except Exception as e:
-                logging.error(f"Error extracting product info: {e}")  # لاگ: خطا در استخراج اطلاعات
+            except:
                 continue
-
     except Exception as e:
-        logging.error(f"Error occurred: {e}")  # لاگ: خطا در کل فرآیند
         return f"❌ خطا در دریافت اطلاعات:\n{e}"
-
     finally:
         driver.quit()
 
     if not results:
-        logging.warning("No results found after processing.")  # لاگ: هیچ نتیجه‌ای پیدا نشد
         return "❌ هیچ محصولی یافت نشد."
 
     results = sorted(results, key=lambda x: x["price"])[:count]
@@ -104,6 +100,7 @@ def get_product_details_sync(product_name, count=3):
         message += f"   💰 {format_price(p['price'])} تومان\n"
         message += f"   🔗 [لینک خرید]({p['link']})\n\n"
     return message
+
 
 
 
