@@ -25,8 +25,11 @@ def format_price(price):
     return f"{price:,}".replace(",", "٬")
 
 def get_product_details(product_name, count=3):
+    
     # بررسی خاص برای عبارت "موتور گازی"
-    if product_name.strip().replace("‌", "").lower() == "موتور گازی":
+    cleaned_name = product_name.replace("‌", "").replace(" ", "").strip().lower()
+    if cleaned_name == "موتورگازی":
+        
         return "ℹ️ لطفاً این محصول را بدون فاصله یعنی «موتورگازی» سرچ کنین 🙏"
 
     chromedriver_autoinstaller.install()
