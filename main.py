@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHANNEL_USERNAME = "@goldencache"
-ADMIN_IDS = []  # Add the admin IDs here
+ADMIN_IDS = []  # Add admin user IDs here
 
 def is_user_in_channel(user_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
@@ -97,7 +97,6 @@ def get_currency_prices():
             price_tag = row.find("td", {"class": "nf"})
             if price_tag:
                 price = price_tag.text.strip().replace(",", "").replace("٬", "")
-                # تقسیم قیمت به 10
                 price_in_toman = int(price) // 10
                 flag = {
                     "دلار": "🇺🇸",
@@ -135,14 +134,12 @@ def telegram_webhook():
         user_id = callback["from"]["id"]
 
         if callback_data == "currency_price":
-            currency_reply = get_currency_prices()
-            send_reply_with_options(callback_chat_id, currency_reply)
-
+            reply = get_currency_prices()
+            send_reply_with_options(callback_chat_id, reply)
         elif callback_data == "product_price":
-            reply = "🔍 لطفاً نام محصول را وارد کنید:"
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
                 "chat_id": callback_chat_id,
-                "text": reply
+                "text": "🔍 لطفاً نام محصول را وارد کنید:"
             })
         return "ok"
 
@@ -184,17 +181,15 @@ def telegram_webhook():
             "text": waiting
         })
         reply = get_product_details(text)
-        # ارسال دکمه‌های انتخاب مجدد پس از نمایش نتایج محصول
         send_reply_with_options(chat_id, reply)
     else:
         reply = "🔎 لطفاً نام محصول را وارد کنید."
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
+            "chat_id": chat_id,
+            "text": reply,
+            "parse_mode": "Markdown"
+        })
 
-    requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
-        "chat_id": chat_id,
-        "text": reply,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
-    })
     return "ok"
 
 if __name__ == "__main__":
