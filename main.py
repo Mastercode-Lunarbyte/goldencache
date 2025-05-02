@@ -43,10 +43,9 @@ def get_product_details(product_name, count=3):
         search_box = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch")
         search_box.send_keys(product_name, Keys.RETURN)
 
-        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block")))
-        time.sleep(2)
-
+        WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block")))
         product_blocks = driver.find_elements(By.CLASS_NAME, "product-block")
+        
         for block in product_blocks:
             try:
                 title = block.find_element(By.CLASS_NAME, "prd-name").text.strip()
@@ -57,7 +56,7 @@ def get_product_details(product_name, count=3):
                 link = "https://emalls.ir/" + data_attr[::-1] if data_attr else "بدون لینک"
 
                 results.append({"title": title, "price": price, "seller": seller, "link": link})
-            except:
+            except Exception as e:
                 continue
     except Exception as e:
         return f"❌ خطا در دریافت اطلاعات:\n{e}"
@@ -91,6 +90,14 @@ def get_currency_prices():
         "پوند انگلیس": "price_gbp"
     }
 
+    flags = {
+        "دلار": "🇺🇸",
+        "یورو": "🇪🇺",
+        "درهم": "🇦🇪",
+        "لیر ترکیه": "🇹🇷",
+        "پوند انگلیس": "🇬🇧"
+    }
+
     message = "💵 قیمت لحظه‌ای ارز:\n\n"
     for name, code in targets.items():
         row = soup.find("tr", {"data-market-row": code})
@@ -98,7 +105,10 @@ def get_currency_prices():
             price_tag = row.find("td", {"class": "nf"})
             if price_tag:
                 price = price_tag.text.strip()
-                message += f"{name}: {price} تومان\n"
+                price = int(price.replace(",", "").replace("٬", ""))
+                price_toman = price // 10  # تبدیل به تومان
+                flag = flags.get(name, "")
+                message += f"{flag} {name}: {format_price(price_toman)} تومان\n"
     return message
 
 @app.route("/", methods=["POST"])
