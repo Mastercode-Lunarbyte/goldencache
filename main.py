@@ -96,8 +96,17 @@ def get_currency_prices():
         if row:
             price_tag = row.find("td", {"class": "nf"})
             if price_tag:
-                price = price_tag.text.strip()
-                message += f"{name}: {price} تومان\n"
+                price = price_tag.text.strip().replace(",", "").replace("٬", "")
+                # تقسیم قیمت به 10
+                price_in_toman = int(price) // 10
+                flag = {
+                    "دلار": "🇺🇸",
+                    "یورو": "🇪🇺",
+                    "درهم": "🇦🇪",
+                    "لیر ترکیه": "🇹🇷",
+                    "پوند انگلیس": "🇬🇧"
+                }.get(name, "")
+                message += f"{name} {flag}: {format_price(price_in_toman)} تومان\n"
     return message
 
 def send_reply_with_options(chat_id, reply):
@@ -126,17 +135,7 @@ def telegram_webhook():
         user_id = callback["from"]["id"]
 
         if callback_data == "currency_price":
-            waiting = "⏳ در حال دریافت قیمت ارز..."
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
-                "chat_id": callback_chat_id,
-                "text": waiting
-            })
             currency_reply = get_currency_prices()
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
-                "chat_id": callback_chat_id,
-                "text": currency_reply
-            })
-            # ارسال دکمه‌های انتخاب مجدد پس از نمایش قیمت ارز
             send_reply_with_options(callback_chat_id, currency_reply)
 
         elif callback_data == "product_price":
