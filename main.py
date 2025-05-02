@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHANNEL_USERNAME = "@goldencache"
-ADMIN_IDS = []
+ADMIN_IDS = []  # Add the admin IDs here
 
 def is_user_in_channel(user_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
@@ -43,9 +43,9 @@ def get_product_details(product_name, count=3):
         search_box = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch")
         search_box.send_keys(product_name, Keys.RETURN)
 
-        WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block")))
+        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block")))
+
         product_blocks = driver.find_elements(By.CLASS_NAME, "product-block")
-        
         for block in product_blocks:
             try:
                 title = block.find_element(By.CLASS_NAME, "prd-name").text.strip()
@@ -56,7 +56,7 @@ def get_product_details(product_name, count=3):
                 link = "https://emalls.ir/" + data_attr[::-1] if data_attr else "بدون لینک"
 
                 results.append({"title": title, "price": price, "seller": seller, "link": link})
-            except Exception as e:
+            except:
                 continue
     except Exception as e:
         return f"❌ خطا در دریافت اطلاعات:\n{e}"
@@ -90,14 +90,6 @@ def get_currency_prices():
         "پوند انگلیس": "price_gbp"
     }
 
-    flags = {
-        "دلار": "🇺🇸",
-        "یورو": "🇪🇺",
-        "درهم": "🇦🇪",
-        "لیر ترکیه": "🇹🇷",
-        "پوند انگلیس": "🇬🇧"
-    }
-
     message = "💵 قیمت لحظه‌ای ارز:\n\n"
     for name, code in targets.items():
         row = soup.find("tr", {"data-market-row": code})
@@ -105,11 +97,23 @@ def get_currency_prices():
             price_tag = row.find("td", {"class": "nf"})
             if price_tag:
                 price = price_tag.text.strip()
-                price = int(price.replace(",", "").replace("٬", ""))
-                price_toman = price // 10  # تبدیل به تومان
-                flag = flags.get(name, "")
-                message += f"{flag} {name}: {format_price(price_toman)} تومان\n"
+                message += f"{name}: {price} تومان\n"
     return message
+
+def send_reply_with_options(chat_id, reply):
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📦 جستجوی قیمت محصول", "callback_data": "product_price"}],
+            [{"text": "💵 قیمت ارز", "callback_data": "currency_price"}]
+        ]
+    }
+    requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
+        "chat_id": chat_id,
+        "text": reply,
+        "parse_mode": "Markdown",
+        "reply_markup": keyboard,
+        "disable_web_page_preview": True
+    })
 
 @app.route("/", methods=["POST"])
 def telegram_webhook():
@@ -132,6 +136,8 @@ def telegram_webhook():
                 "chat_id": callback_chat_id,
                 "text": currency_reply
             })
+            # ارسال دکمه‌های انتخاب مجدد پس از نمایش قیمت ارز
+            send_reply_with_options(callback_chat_id, currency_reply)
 
         elif callback_data == "product_price":
             reply = "🔍 لطفاً نام محصول را وارد کنید:"
@@ -179,6 +185,8 @@ def telegram_webhook():
             "text": waiting
         })
         reply = get_product_details(text)
+        # ارسال دکمه‌های انتخاب مجدد پس از نمایش نتایج محصول
+        send_reply_with_options(chat_id, reply)
     else:
         reply = "🔎 لطفاً نام محصول را وارد کنید."
 
