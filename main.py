@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -25,11 +26,8 @@ def format_price(price):
     return f"{price:,}".replace(",", "٬")
 
 def get_product_details(product_name, count=3):
-    
-    # بررسی خاص برای عبارت "موتور گازی"
     cleaned_name = product_name.replace("‌", "").replace(" ", "").strip().lower()
     if cleaned_name == "موتورگازی" and (" " in product_name or "‌" in product_name):
-        
         return "ℹ️ لطفاً این محصول را بدون فاصله یعنی «موتورگازی» سرچ کنین 🙏"
 
     chromedriver_autoinstaller.install()
@@ -45,9 +43,7 @@ def get_product_details(product_name, count=3):
         search_box = driver.find_element(By.ID, "ContentPlaceHolder1_SearchInBottom_txtSearch")
         search_box.send_keys(product_name, Keys.RETURN)
 
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block"))
-        )
+        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "product-block")))
         time.sleep(2)
 
         product_blocks = driver.find_elements(By.CLASS_NAME, "product-block")
@@ -60,12 +56,7 @@ def get_product_details(product_name, count=3):
                 data_attr = block.find_element(By.CLASS_NAME, "btn-buyshop").get_attribute("data-esrever")
                 link = "https://emalls.ir/" + data_attr[::-1] if data_attr else "بدون لینک"
 
-                results.append({
-                    "title": title,
-                    "price": price,
-                    "seller": seller,
-                    "link": link
-                })
+                results.append({"title": title, "price": price, "seller": seller, "link": link})
             except:
                 continue
     except Exception as e:
@@ -85,9 +76,61 @@ def get_product_details(product_name, count=3):
         message += f"   🔗 [لینک خرید]({p['link']})\n\n"
     return message
 
+def get_currency_prices():
+    url = "https://www.tgju.org/currency"
+    response = requests.get(url)
+    if response.status_code != 200:
+        return "❌ خطا در دسترسی به قیمت ارز."
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    targets = {
+        "دلار": "price_dollar_rl",
+        "یورو": "price_eur",
+        "درهم": "price_aed",
+        "لیر ترکیه": "price_try",
+        "پوند انگلیس": "price_gbp"
+    }
+
+    message = "💵 قیمت لحظه‌ای ارز:\n\n"
+    for name, code in targets.items():
+        row = soup.find("tr", {"data-market-row": code})
+        if row:
+            price_tag = row.find("td", {"class": "nf"})
+            if price_tag:
+                price = price_tag.text.strip()
+                message += f"{name}: {price} تومان\n"
+    return message
+
 @app.route("/", methods=["POST"])
 def telegram_webhook():
     data = request.json
+
+    callback = data.get("callback_query")
+    if callback:
+        callback_data = callback["data"]
+        callback_chat_id = callback["message"]["chat"]["id"]
+        user_id = callback["from"]["id"]
+
+        if callback_data == "currency_price":
+            waiting = "⏳ در حال دریافت قیمت ارز..."
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
+                "chat_id": callback_chat_id,
+                "text": waiting
+            })
+            currency_reply = get_currency_prices()
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
+                "chat_id": callback_chat_id,
+                "text": currency_reply
+            })
+
+        elif callback_data == "product_price":
+            reply = "🔍 لطفاً نام محصول را وارد کنید:"
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
+                "chat_id": callback_chat_id,
+                "text": reply
+            })
+        return "ok"
+
     message = data.get("message")
     if not message:
         return "no message"
@@ -97,25 +140,34 @@ def telegram_webhook():
     text = message.get("text", "")
 
     if text.lower() in ["/start", "start", "سلام", "سلام ربات"]:
-        welcome = "👋 سلام! خوش اومدی 🌟\nاین ربات بهت کمک می‌کنه **بهترین قیمت** محصولات رو توی فروشگاه‌های آنلاین ایران پیدا کنی.\nفقط کافیه اسم محصول رو بنویسی! 📦💬"
+        welcome = "👋 سلام! لطفاً یکی از گزینه‌های زیر را انتخاب کن:"
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "📦 جستجوی قیمت محصول", "callback_data": "product_price"}],
+                [{"text": "💵 قیمت ارز", "callback_data": "currency_price"}]
+            ]
+        }
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
-            "chat_id": chat_id, "text": welcome
+            "chat_id": chat_id,
+            "text": welcome,
+            "reply_markup": keyboard
         })
         return "ok"
 
     if not is_user_in_channel(user_id) and user_id not in ADMIN_IDS:
         join_msg = f"❗ برای استفاده از ربات لطفاً ابتدا در کانال ما عضو شوید:\n👉 https://t.me/goldencache"
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
-            "chat_id": chat_id, "text": join_msg
+            "chat_id": chat_id,
+            "text": join_msg
         })
         return "ok"
 
     if text:
         waiting = "⏳ در حال جستجوی محصول مورد نظر شما هستم..."
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={
-            "chat_id": chat_id, "text": waiting
+            "chat_id": chat_id,
+            "text": waiting
         })
-
         reply = get_product_details(text)
     else:
         reply = "🔎 لطفاً نام محصول را وارد کنید."
